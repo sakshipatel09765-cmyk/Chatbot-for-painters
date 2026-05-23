@@ -1,0 +1,2 @@
+change in bot - old conversation history and work on old conversation when user want 
+i want the bot can generate image also and understand if user give image and what user ask to with their given image ,bot do that - like user give his/her artwork they want to make change the background or they just ask bot how was it? for appresial and many possibility where here

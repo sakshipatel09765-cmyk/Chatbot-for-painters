@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vision Buddy — Creative Collaborator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <div class="app-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎨</div>
+        <h1 class="logo-title">Vision<br/>Buddy</h1>
+      </div>
+      <div class="sidebar-bio">
+        <p>Your personal AI muse for sketching, DIY, crochet, rangoli, journaling & digital art.</p>
+      </div>
+      <div class="sidebar-tags">
+        <span class="tag">✏️ Sketching</span>
+        <span class="tag">🧶 Crochet</span>
+        <span class="tag">🌸 Rangoli</span>
+        <span class="tag">✂️ DIY</span>
+        <span class="tag">📖 Journaling</span>
+        <span class="tag">🖥️ Digital Art</span>
+        <span class="tag">🗿 3D Arts</span>
+        <span class="tag">📸 Photo tips</span>
+      </div>
+      <div class="sidebar-prompts">
+        <p class="prompts-label">Try asking...</p>
+        <button class="prompt-chip" onclick="sendQuick('Give me 3 rangoli ideas for my college project')">🌸 Rangoli ideas</button>
+        <button class="prompt-chip" onclick="sendQuick('How do I photograph my crochet work with my phone?')">📸 Photo tips</button>
+        <button class="prompt-chip" onclick="sendQuick('I am feeling creatively blocked, help me')">💭 Creative block</button>
+        <button class="prompt-chip" onclick="sendQuick('Suggest some digital art references for beginners')">🖥️ Digital art refs</button>
+      </div>
+
+      <button class="clear-btn" onclick="clearChat()">✦ New conversation</button>
+
+      <div class="history-section">
+        <p class="history-label">Past conversations</p>
+        <div class="history-list" id="history-list">
+          <p class="history-empty">No past conversations yet.</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CHAT -->
+    <main class="chat-area">
+
+      <!-- LANDING SCREEN -->
+      <div class="landing-screen" id="landing-screen">
+        <div class="landing-greeting">
+          <h1>What's on your<br/><span>creative agenda?</span></h1>
+          <p>Your AI muse for art, sketching, crochet, rangoli, journaling & more.</p>
+        </div>
+        <div class="landing-input-wrapper">
+          <textarea id="landing-input"
+            placeholder="Ask anything — brainstorm, generate art, get feedback..."
+            rows="1" onkeydown="handleLandingKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="landing-send-btn" onclick="sendFromLanding()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="landing-suggestions">
+          <button class="suggestion-chip" onclick="sendQuick('Give me 3 rangoli ideas for my college project')">🌸 Rangoli ideas</button>
+          <button class="suggestion-chip" onclick="sendQuick('Generate image of a lotus in watercolor style')">🎨 Generate art</button>
+          <button class="suggestion-chip" onclick="sendQuick('How do I photograph my crochet work with my phone?')">📸 Photo tips</button>
+          <button class="suggestion-chip" onclick="sendQuick('I am feeling creatively blocked, help me')">💭 Creative block</button>
+          <button class="suggestion-chip" onclick="sendQuick('generate 2 pencil sketch images of mountains')">✏️ Sketch art</button>
+        </div>
+      </div>
+
+      <!-- CHAT HEADER -->
+      <div class="chat-header" id="chat-header">
+        <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="status-dot"></div>
+        <span class="status-text">Hello Vision Buddy, <br><strong>How can I help you? ✨</strong></span>
+      </div>
+
+      <!-- MESSAGES -->
+      <div class="messages" id="messages"></div>
+
+      <!-- BOTTOM INPUT -->
+      <div class="input-area" id="input-area">
+        <div class="input-wrapper">
+          <textarea id="user-input"
+            placeholder="Share your idea, ask for inspiration..."
+            rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" onclick="sendMessage()" id="send-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <p class="input-hint">Press Enter to send · Shift+Enter for new line</p>
+      </div>
+
+    </main>
+  </div>
+  <script src="/static/script.js"></script>
+</body>
+</html>
