@@ -193,13 +193,29 @@ function formatText(text) {
 
 function detectCount(text) {
   const t = text.toLowerCase();
-  // Look for digits 2, 3, or 4 anywhere in text
-  const match = t.match(/\b([2-4])\b/);
-  if (match) {
-    const n = parseInt(match[1]);
-    if (n >= 2 && n <= 4) return n;
+  const digitMatch = t.match(/\b([2-4])\b/);
+  if (digitMatch) {
+    return parseInt(digitMatch[1], 10);
   }
-  if (t.includes("few") || t.includes("some") || t.includes("multiple")) return 3;
+
+  const wordCounts = {
+    two: 2,
+    three: 3,
+    four: 4,
+    couple: 2,
+    several: 3,
+    many: 4
+  };
+  for (const [word, num] of Object.entries(wordCounts)) {
+    if (t.includes(` ${word} `) || t.startsWith(`${word} `) || t.endsWith(` ${word}`)) {
+      return num;
+    }
+  }
+
+  if (t.includes("a few") || t.includes("some") || t.includes("multiple") || t.includes("variations") || t.includes("versions")) {
+    return 3;
+  }
+
   return 1;
 }
 

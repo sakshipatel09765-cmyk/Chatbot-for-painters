@@ -20,7 +20,7 @@ if not _env_path.exists():
 load_dotenv(dotenv_path=_env_path, override=True)
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET", "Sakshi's_chatbot_1523")
+app.secret_key = os.getenv("Sakshi's_chatbot_1523", "visionbuddy_secret_2024")
 
 # Folder where generated images are saved on disk
 IMAGES_DIR = Path(__file__).resolve().parent / "static" / "generated"
@@ -284,26 +284,38 @@ def generate_image():
         prompt_to_use = prompts[idx]
         encoded = urllib.parse.quote(prompt_to_use)
         seed = seeds[idx]
-        for model_name in ["turbo", "flux"]:
+        for model_name in ["turbo", "turbo", "flux"]:  # try turbo twice then flux
             try:
+                # Slightly vary seed each attempt
+                current_seed = (seed + model_name.__hash__()) % 999999
                 url = (
                     f"https://image.pollinations.ai/prompt/{encoded}"
-                    f"?width={width}&height={height}&model={model_name}&seed={seed}&nologo=true"
+                    f"?width={width}&height={height}&model={model_name}&seed={current_seed}&nologo=true"
                 )
-                resp = requests.get(url, timeout=90)
+                resp = requests.get(url, timeout=75)
                 resp.raise_for_status()
-                if len(resp.content) > 1000:  # valid image
+                if len(resp.content) > 1000:
                     return resp.content
             except Exception:
                 continue
         return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=count) as executor:
-        futures = {executor.submit(fetch_one, i): i for i in range(count)}
-        results = [None] * count
-        for future in concurrent.futures.as_completed(futures):
-            i = futures[future]
-            results[i] = future.result()
+    # Run parallel but with individual retry — collect all results
+    results = [None] * count
+    max_attempts = 2  # retry failed ones up to 2 times
+
+    for attempt in range(max_attempts):
+        pending = [i for i in range(count) if results[i] is None]
+        if not pending:
+            break
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(pending)) as executor:
+            futures = {executor.submit(fetch_one, i): i for i in pending}
+            for future in concurrent.futures.as_completed(futures, timeout=100):
+                i = futures[future]
+                try:
+                    results[i] = future.result()
+                except Exception:
+                    pass
 
     # Save images to disk
     image_urls = []
