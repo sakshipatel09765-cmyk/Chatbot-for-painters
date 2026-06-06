@@ -192,7 +192,7 @@ def analyze_image():
 # ---- IMAGE GENERATION HELPERS ----
 
 def fetch_stability(prompt_text, w, h):
-    """Stability AI — uses free credits, works in India."""
+    """Stability AI — works in India."""
     stability_key = os.getenv("STABILITY_API_KEY", "").strip()
     if not stability_key:
         return None
@@ -394,7 +394,7 @@ def generate_image():
     def fetch_one(idx):
         prompt_to_use = prompts[idx]
         seed = seeds[idx]
-        # 1. Try Stability AI (best, works in India)
+        # 1. Try Stability AI
         result = fetch_stability(prompt_to_use, width, height)
         if result:
             return result
