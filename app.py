@@ -20,15 +20,19 @@ if not _env_path.exists():
 load_dotenv(dotenv_path=_env_path, override=True)
 
 app = Flask(__name__)
-app.secret_key = os.getenv("Sakshi's_chatbot_1523", "visionbuddy_secret_2024")
+app.secret_key = os.getenv("FLASK_SECRET", "visionbuddy_secret_2024")
 
 # Folder where generated images are saved on disk
 IMAGES_DIR = Path(__file__).resolve().parent / "static" / "generated"
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---- API CLIENTS ----
-groq_client = Groq(api_key=os.getenv("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"))
-_anthropic_key = os.getenv("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", "").strip()
+_groq_key = os.getenv("GROQ_API_KEY", "").strip()
+if not _groq_key:
+    raise ValueError("GROQ_API_KEY not found in .env file!")
+groq_client = Groq(api_key=_groq_key)
+
+_anthropic_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
 claude_client = anthropic.Anthropic(api_key=_anthropic_key) if _anthropic_key else None
 
 # ---- SYSTEM PROMPT ----
@@ -114,7 +118,6 @@ def chat():
         }
 
     conversation = all_convos[session_id]["messages"]
-    # Only keep last 20 messages to avoid token limits
     conversation.append({"role": "user", "content": user_message})
     recent = conversation[-20:]
 
@@ -186,13 +189,119 @@ def analyze_image():
     return jsonify({"reply": reply})
 
 
+# ---- IMAGE GENERATION HELPERS ----
+
+def fetch_stability(prompt_text, w, h):
+    """Stability AI — uses free credits, works in India."""
+    stability_key = os.getenv("STABILITY_API_KEY", "").strip()
+    if not stability_key:
+        return None
+    try:
+        resp = requests.post(
+            "https://api.stability.ai/v2beta/stable-image/generate/core",
+            headers={
+                "Authorization": f"Bearer {stability_key}",
+                "Accept": "image/*"
+            },
+            files={"none": ""},
+            data={
+                "prompt": prompt_text,
+                "output_format": "jpeg",
+                "width": min(w, 1344),
+                "height": min(h, 768),
+            },
+            timeout=60
+        )
+        if resp.status_code == 200 and len(resp.content) > 5000:
+            return resp.content
+        else:
+            print(f"[Stability] status={resp.status_code} body={resp.text[:200]}")
+    except Exception as e:
+        print(f"[Stability] error: {e}")
+    return None
+
+
+def fetch_pollinations(prompt_text, w, h, seed_val):
+    """Try Pollinations API - handles queue full (402) with retries and waits."""
+    import time, socket
+    old_getaddrinfo = socket.getaddrinfo
+    def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
+        return old_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+    socket.getaddrinfo = getaddrinfo_ipv4
+    encoded = urllib.parse.quote(prompt_text)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": "https://pollinations.ai/",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+    try:
+        for model_name in ["turbo", "flux", "flux-realism"]:
+            for attempt in range(5):
+                try:
+                    current_seed = abs((seed_val + hash(model_name) + attempt * 1000)) % 999999
+                    url = (
+                        f"https://image.pollinations.ai/prompt/{encoded}"
+                        f"?width={w}&height={h}&model={model_name}"
+                        f"&seed={current_seed}&nologo=true&nofeed=true"
+                    )
+                    resp = requests.get(url, timeout=90, headers=headers)
+                    if resp.status_code == 402:
+                        wait = (attempt + 1) * 8
+                        print(f"[Pollinations] Queue full, waiting {wait}s...")
+                        time.sleep(wait)
+                        continue
+                    ct = resp.headers.get("Content-Type", "")
+                    if resp.status_code == 200 and ct.startswith("image/") and len(resp.content) > 5000:
+                        return resp.content
+                except Exception as e:
+                    print(f"[Pollinations] model={model_name} attempt={attempt}: {e}")
+                    time.sleep(3)
+    finally:
+        socket.getaddrinfo = old_getaddrinfo
+    return None
+
+
+def fetch_together(prompt_text, w, h):
+    """Together AI free FLUX.1-schnell — needs TOGETHER_API_KEY in .env"""
+    together_key = os.getenv("TOGETHER_API_KEY", "").strip()
+    if not together_key:
+        return None
+    try:
+        resp = requests.post(
+            "https://api.together.xyz/v1/images/generations",
+            headers={
+                "Authorization": f"Bearer {together_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "black-forest-labs/FLUX.1-schnell-Free",
+                "prompt": prompt_text,
+                "width": min(w, 1024),
+                "height": min(h, 1024),
+                "steps": 4,
+                "n": 1
+            },
+            timeout=90
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        img_url = result["data"][0].get("url")
+        if img_url:
+            img_resp = requests.get(img_url, timeout=30)
+            if len(img_resp.content) > 5000:
+                return img_resp.content
+    except Exception as e:
+        print(f"[Together] error: {e}")
+    return None
+
+
 @app.route("/generate-image", methods=["POST"])
 def generate_image():
     data = request.get_json()
     user_prompt = data.get("prompt", "").strip()
     session_id = data.get("session_id", "default")
     style = data.get("style", "")
-    count = max(1, min(int(data.get("count", 1)), 4))  # clamp between 1-4
+    count = max(1, min(int(data.get("count", 1)), 8))  # 1–8 images
     last_prompt = data.get("last_prompt", "")
     width = int(data.get("width", 512))
     height = int(data.get("height", 512))
@@ -246,12 +355,15 @@ def generate_image():
         ", wide-angle view, cool dramatic side lighting",
         ", top-down bird's eye view, soft diffused lighting",
         ", macro detail, cinematic lighting, rich shadows",
+        ", portrait orientation, misty morning atmosphere",
+        ", dramatic low angle, vibrant saturated colors",
+        ", minimalist composition, soft pastel tones",
+        ", bird eye view, sharp contrasty light",
     ]
 
     if count == 1:
         prompts = [base_prompt]
     else:
-        # Try Groq to generate distinct prompts
         try:
             vr = groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
@@ -270,7 +382,6 @@ def generate_image():
                 for l in vr.choices[0].message.content.strip().splitlines()
                 if l.strip()
             ]
-            # Pad to count if Groq returned fewer lines
             while len(lines) < count:
                 lines.append(f"{base_prompt}{variation_suffixes[len(lines) % len(variation_suffixes)]}")
             prompts = lines[:count]
@@ -282,40 +393,34 @@ def generate_image():
 
     def fetch_one(idx):
         prompt_to_use = prompts[idx]
-        encoded = urllib.parse.quote(prompt_to_use)
         seed = seeds[idx]
-        for model_name in ["turbo", "turbo", "flux"]:  # try turbo twice then flux
-            try:
-                # Slightly vary seed each attempt
-                current_seed = (seed + model_name.__hash__()) % 999999
-                url = (
-                    f"https://image.pollinations.ai/prompt/{encoded}"
-                    f"?width={width}&height={height}&model={model_name}&seed={current_seed}&nologo=true"
-                )
-                resp = requests.get(url, timeout=75)
-                resp.raise_for_status()
-                if len(resp.content) > 1000:
-                    return resp.content
-            except Exception:
-                continue
-        return None
+        # 1. Try Stability AI (best, works in India)
+        result = fetch_stability(prompt_to_use, width, height)
+        if result:
+            return result
+        # 2. Try Pollinations as fallback
+        result = fetch_pollinations(prompt_to_use, width, height, seed)
+        if result:
+            return result
+        # 3. Try Together AI
+        result = fetch_together(prompt_to_use, width, height)
+        return result
 
-    # Run parallel but with individual retry — collect all results
     results = [None] * count
-    max_attempts = 2  # retry failed ones up to 2 times
+    max_attempts = 3
 
     for attempt in range(max_attempts):
         pending = [i for i in range(count) if results[i] is None]
         if not pending:
             break
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(pending)) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(pending), 8)) as executor:
             futures = {executor.submit(fetch_one, i): i for i in pending}
-            for future in concurrent.futures.as_completed(futures, timeout=100):
+            for future in concurrent.futures.as_completed(futures, timeout=120):
                 i = futures[future]
                 try:
                     results[i] = future.result()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[generate_image] attempt={attempt} idx={i} error: {e}")
 
     # Save images to disk
     image_urls = []
@@ -327,7 +432,7 @@ def generate_image():
             image_urls.append(f"/static/generated/{fname}")
 
     if not image_urls:
-        return jsonify({"error": "Image generation failed. Please try again."}), 500
+        return jsonify({"error": "Image generation failed. Please check your internet connection and try again."}), 500
 
     # Save to conversation history
     all_convos = load_all_conversations()

@@ -264,13 +264,3 @@ textarea::placeholder { color: var(--gray-400); }
 .bot-bubble em { font-style: italic; color: var(--gray-600); }
 .bot-bubble p { margin-bottom: 5px; }
 .bot-bubble p:last-child { margin-bottom: 0; }
-
-.gen-image-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  max-width: 480px;
-}
-.gen-image-single { display: flex; flex-direction: column; gap: 10px; }
-.gen-image-wrapper { display: flex; flex-direction: column; gap: 6px; }
-.gen-image-grid .generated-image { width: 100%; max-width: 100%; }
