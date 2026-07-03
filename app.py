@@ -15,9 +15,8 @@ from pathlib import Path
 
 # Load .env from same folder as this script
 _env_path = Path(__file__).resolve().parent / ".env"
-if not _env_path.exists():
-    raise FileNotFoundError(f"\n\n  .env file not found at: {_env_path}\n  Please copy .env.example to .env\n")
-load_dotenv(dotenv_path=_env_path, override=True)
+if _env_path.exists():
+    load_dotenv(dotenv_path=_env_path, override=True)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "visionbuddy_secret_2024")
@@ -503,4 +502,5 @@ def delete_conversation():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
